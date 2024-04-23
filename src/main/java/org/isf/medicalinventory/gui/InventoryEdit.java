@@ -86,6 +86,7 @@ import org.isf.medicalstock.manager.MovStockInsertingManager;
 import org.isf.medicalstock.model.Lot;
 import org.isf.menu.manager.Context;
 import org.isf.menu.manager.UserBrowsingManager;
+import org.isf.serviceprinting.manager.PrintInventory;
 import org.isf.utils.db.NormalizeString;
 import org.isf.utils.exception.OHServiceException;
 import org.isf.utils.exception.gui.OHServiceExceptionUtil;
@@ -141,6 +142,7 @@ public class InventoryEdit extends ModalJFrame {
 	private JButton closeButton;
 	private JButton deleteButton;
 	private JButton saveButton;
+	private JButton printButton;
 	private JScrollPane scrollPaneInventory;
 	private JTable jTableInventoryRow;
 	private List<MedicalInventoryRow> inventoryRowList;
@@ -175,6 +177,7 @@ public class InventoryEdit extends ModalJFrame {
 	private MedicalInventoryRowManager medicalInventoryRowManager = Context.getApplicationContext().getBean(MedicalInventoryRowManager.class);
 	private MedicalBrowsingManager medicalBrowsingManager = Context.getApplicationContext().getBean(MedicalBrowsingManager.class);
 	private MovStockInsertingManager movStockInsertingManager = Context.getApplicationContext().getBean(MovStockInsertingManager.class);
+	private PrintInventory printInventory = Context.getApplicationContext().getBean(PrintInventory.class);
 
 	public InventoryEdit() {
 		initComponents();
@@ -320,6 +323,7 @@ public class InventoryEdit extends ModalJFrame {
 			panelFooter = new JPanel();
 			panelFooter.add(getNewButton());
 			panelFooter.add(getDeleteButton());
+			panelFooter.add(getPrintButton());
 			panelFooter.add(getCloseButton());
 		}
 		return panelFooter;
@@ -497,6 +501,30 @@ public class InventoryEdit extends ModalJFrame {
 		return closeButton;
 	}
 
+	private JButton getPrintButton() {
+		printButton = new JButton(MessageBundle.getMessage("angal.inventory.print.btn"));
+		printButton.setMnemonic(MessageBundle.getMnemonic("angal.inventory.print.btn.key"));
+		printButton.addActionListener(actionEvent -> {
+				if (inventory != null) {
+					if (inventory.getId() > 0) {
+						int printQtyReal = 0;
+						if (inventory.getStatus().equals(InventoryStatus.draft.toString())) {
+							int response = MessageDialog.yesNo(null, "angal.inventory.askforrealquantityempty.msg");
+							if (response == JOptionPane.YES_OPTION) {
+								printQtyReal = 1;
+							}
+						}
+						printInventory.PrintInventoryPDF("InventoryReport", inventory, printQtyReal);
+					} else {
+						MessageDialog.error(null, "angal.inventory.pleasesavebeforprinting.msg");
+					}
+				} else {
+					MessageDialog.error(null, "angal.inventory.pleasesavebeforprinting.msg");
+				}
+			});
+		return printButton;
+	}
+	
 	private JScrollPane getScrollPaneInventory() {
 		if (scrollPaneInventory == null) {
 			scrollPaneInventory = new JScrollPane();
