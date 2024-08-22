@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
 import javax.swing.DefaultCellEditor;
 import javax.swing.JButton;
@@ -85,6 +86,8 @@ import org.isf.medicalstock.manager.MovStockInsertingManager;
 import org.isf.medicalstock.model.Lot;
 import org.isf.medstockmovtype.manager.MedicalDsrStockMovementTypeBrowserManager;
 import org.isf.medstockmovtype.model.MovementType;
+import org.isf.medtype.manager.MedicalTypeBrowserManager;
+import org.isf.medtype.model.MedicalType;
 import org.isf.menu.manager.Context;
 import org.isf.menu.manager.UserBrowsingManager;
 import org.isf.supplier.manager.SupplierBrowserManager;
@@ -190,7 +193,6 @@ public class InventoryEdit extends ModalJFrame {
 	private String code = null;
 	private String mode = null;
 	private JLabel referenceLabel;
-	private JLabel statusLabel;
 	private JLabel chargeTypeLabel;
 	private JLabel dischargeTypeLabel;
 	private JLabel supplierLabel;
@@ -207,6 +209,15 @@ public class InventoryEdit extends ModalJFrame {
 	private Ward destination = null;
 	private boolean selectAll = false;
 	private String newReference = null;
+	private JButton selectButton;
+	private JPanel mainPanel;
+	private JRadioButton all;
+	private JRadioButton onlyNonZero;
+	private JRadioButton withMovement;
+	private MedicalType medicalTypeSelected;
+	private JComboBox<MedicalType> medicalTypeComboBox;
+	
+	private MedicalTypeBrowserManager medicalTypeManager = Context.getApplicationContext().getBean(MedicalTypeBrowserManager.class);
 	private MedicalInventoryManager medicalInventoryManager = Context.getApplicationContext().getBean(MedicalInventoryManager.class);
 	private MedicalInventoryRowManager medicalInventoryRowManager = Context.getApplicationContext().getBean(MedicalInventoryRowManager.class);
 	private MedicalBrowsingManager medicalBrowsingManager = Context.getApplicationContext().getBean(MedicalBrowsingManager.class);
@@ -272,7 +283,7 @@ public class InventoryEdit extends ModalJFrame {
 			referenceTextField.setEditable(false);
 			jCalendarInventory.setEnabled(false);
 			specificRadio.setEnabled(false);
-			allRadio.setEnabled(false);
+			//allRadio.setEnabled(false);
 			chargeCombo.setEnabled(false);
 			dischargeCombo.setEnabled(false);
 			supplierCombo.setEnabled(false);
@@ -286,7 +297,7 @@ public class InventoryEdit extends ModalJFrame {
 			referenceTextField.setEditable(true);
 			jCalendarInventory.setEnabled(true);
 			specificRadio.setEnabled(true);
-			allRadio.setEnabled(true);
+			//allRadio.setEnabled(true);
 			chargeCombo.setEnabled(true);
 			dischargeCombo.setEnabled(true);
 			supplierCombo.setEnabled(true);
@@ -387,21 +398,13 @@ public class InventoryEdit extends ModalJFrame {
 			gbc_codeTextField.gridx = 1;
 			gbc_codeTextField.gridy = 3;
 			panelHeader.add(getCodeTextField(), gbc_codeTextField);
-			GridBagConstraints gbc_allRadio = new GridBagConstraints();
-			gbc_allRadio.anchor = GridBagConstraints.EAST;
-			gbc_allRadio.insets = new Insets(0, 0, 0, 5);
-			gbc_allRadio.gridx = 2;
-			gbc_allRadio.gridy = 3;
-			panelHeader.add(getAllRadio(), gbc_allRadio);
-			ButtonGroup group = new ButtonGroup();
-			group.add(specificRadio);
-			group.add(allRadio);
-			GridBagConstraints gbc_statusLabel = new GridBagConstraints();
-			gbc_statusLabel.anchor = GridBagConstraints.EAST;
-			gbc_statusLabel.insets = new Insets(0, 0, 5, 5);
-			gbc_statusLabel.gridx = 3;
-			gbc_statusLabel.gridy = 3;
-			panelHeader.add(getStatusLabel(), gbc_statusLabel);
+			GridBagConstraints gbc_selectButton = new GridBagConstraints();
+			gbc_selectButton.anchor = GridBagConstraints.CENTER;
+			gbc_selectButton.insets = new Insets(0, 0, 0, 5);
+			gbc_selectButton.gridx = 3;
+			gbc_selectButton.gridy = 3;
+			panelHeader.add(getSelectedButton(), gbc_selectButton);
+			
 		}
 		return panelHeader;
 	}
@@ -889,6 +892,58 @@ public class InventoryEdit extends ModalJFrame {
 		return resetButton;
 	}
 
+	private JPanel getSelectedButton() {
+		JPanel pan = new JPanel();
+		if (selectButton == null) {
+			JLabel texte = new JLabel(MessageBundle.getMessage("angal.inventory.allproduct.txt"));
+			selectButton = new JButton(MessageBundle.getMessage("angal.common.select.btn"));
+			selectButton.setMnemonic(MessageBundle.getMnemonic("angal.common.select.btn.key"));
+			selectButton.addActionListener(actionEvent -> {
+				// Création du panneau principal
+		        mainPanel = new JPanel();
+		        mainPanel.setLayout(new BorderLayout(10, 10)); // Espacement entre les composants
+		        
+		        // Panneau pour la liste déroulante
+		        JPanel leftPanel = new JPanel();
+		        leftPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 20));
+		        leftPanel.setLayout(new GridLayout(3,1));
+		        leftPanel.add(new JLabel(MessageBundle.getMessage("angal.inventoryrow.medicaltype.txt")));
+		        leftPanel.add(getJComboMedicalType());
+		        
+		        // Grouper les boutons radio pour qu'une seule option puisse être sélectionnée
+		        ButtonGroup radioGroup = new ButtonGroup();
+		        radioGroup.add(all);
+		        radioGroup.add(onlyNonZero);
+		        radioGroup.add(withMovement);
+		        
+		        // Panneau pour les boutons radio
+		        JPanel rightPanel = new JPanel();
+		        rightPanel.setLayout(new GridLayout(3, 1, 5, 5)); // 3 lignes, 1 colonne
+		        rightPanel.add(getAllRadioButton());
+		        rightPanel.add(getMedicalWithNonZeroQuatityRadioButton());
+		        rightPanel.add(getMedicalWithMovementRadioButton());
+		        
+		        // Ajouter les panneaux au panneau principal
+		        mainPanel.add(leftPanel, BorderLayout.WEST);
+		        mainPanel.add(rightPanel, BorderLayout.EAST);
+		        
+		        int ok = JOptionPane.showConfirmDialog(this, mainPanel,
+		        				MessageBundle.getMessage("angal.inventoryrow.lotinformation.title"),
+								JOptionPane.OK_CANCEL_OPTION);
+
+				if (ok == JOptionPane.OK_OPTION) {
+					medicalTypeSelected = (MedicalType) medicalTypeComboBox.getSelectedItem();
+					if(medicalTypeSelected.getDescription().equals(MessageBundle.getMessage("angal.common.all.txt"))) {
+						
+					}
+				}
+			});
+			pan.add(texte);
+			pan.add(selectButton);
+		}
+		return pan;
+	}
+	
 	private JScrollPane getScrollPaneInventory() {
 		if (scrollPaneInventory == null) {
 			scrollPaneInventory = new JScrollPane();
@@ -968,7 +1023,7 @@ public class InventoryEdit extends ModalJFrame {
 					addMedInRowInInventorySearchList(invRow);
 				}
 				selectAll = true;
-				MessageDialog.info(null, "angal.invetory.allmedicaladdedsuccessfully.msg");
+				MessageDialog.info(null, "angal.inventory.allmedicaladdedsuccessfully.msg");
 			} else {
 				MessageDialog.info(null, "angal.inventory.youhavealreadyaddedallproduct.msg");
 			}
@@ -1564,15 +1619,6 @@ public class InventoryEdit extends ModalJFrame {
 		}
 		return referenceLabel;
 	}
-	
-	private JLabel getStatusLabel() {
-		if (statusLabel == null) {
-			String currentStatus = inventory == null ? "draft" : inventory.getStatus();
-			statusLabel = new JLabel(MessageBundle.getMessage("angal.inventory.status.label")+" "+MessageBundle.getMessage("angal.inventory."+currentStatus));
-			statusLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-		}
-		return statusLabel;
-	}
 
 	private JLabel getChargeLabel() {
 		if (chargeTypeLabel == null) {
@@ -1775,5 +1821,69 @@ public class InventoryEdit extends ModalJFrame {
 		lotsDeleted.clear();
 		inventoryRowListAdded.clear();
 		lotsSaved.clear();
+	}
+	
+	private JComboBox<MedicalType> getJComboMedicalType() {
+		if (medicalTypeComboBox == null) {
+			medicalTypeComboBox = new JComboBox<MedicalType>();
+			try {
+				List<MedicalType> medicalTypes = medicalTypeManager.getMedicalType();	
+				MedicalType medicalType = new MedicalType(MessageBundle.getMessage("angal.common.all.txt"), MessageBundle.getMessage("angal.common.all.txt"));
+				medicalTypeComboBox.addItem(medicalType);
+				for (MedicalType medType: medicalTypes) {
+					medicalTypeComboBox.addItem(medType);
+				}
+			} catch (OHServiceException e) {
+				OHServiceExceptionUtil.showMessages(e);
+			}
+			
+			medicalTypeComboBox.addActionListener(actionEvent -> {
+				medicalTypeSelected = (MedicalType) medicalTypeComboBox.getSelectedItem();
+			});
+		}
+		return medicalTypeComboBox;
+	}
+	
+    private JRadioButton getAllRadioButton() {
+    	if (all == null) {
+    		all = new JRadioButton(MessageBundle.getMessage("angal.common.all.btn"));
+    		all.setMnemonic(MessageBundle.getMnemonic("angal.common.all.btn.key"));
+    		all.setSelected(true);
+    	}
+    	all.addActionListener(actionEvent -> {
+    		if (all.isSelected()) {
+    			onlyNonZero.setSelected(false);
+				withMovement.setSelected(false);
+			}
+		});
+		return all;
+	}
+    
+    private JRadioButton getMedicalWithNonZeroQuatityRadioButton() {
+    	if (onlyNonZero == null) {
+    		onlyNonZero = new JRadioButton(MessageBundle.getMessage("angal.inventory.medicalwithonlynonzeroqty.btn"));
+    		onlyNonZero.setMnemonic(MessageBundle.getMnemonic("angal.inventory.medicalwithonlynonzeroqty.btn.key"));
+    	}
+    	onlyNonZero.addActionListener(actionEvent -> {
+			if (onlyNonZero.isSelected()) {
+				all.setSelected(false);
+				withMovement.setSelected(false);
+			}
+		});
+		return onlyNonZero;
+	}
+    
+    private JRadioButton getMedicalWithMovementRadioButton() {
+    	if (withMovement == null) {
+    		withMovement = new JRadioButton(MessageBundle.getMessage("angal.inventory.medicalwithmovementonly.btn"));
+    		withMovement.setMnemonic(MessageBundle.getMnemonic("angal.inventory.medicalwithmovementonly.btn.key"));
+    	}
+    	withMovement.addActionListener(actionEvent -> {
+    		if (onlyNonZero.isSelected()) {
+				all.setSelected(false);
+				onlyNonZero.setSelected(false);
+			}
+		});
+		return withMovement;
 	}
 }
